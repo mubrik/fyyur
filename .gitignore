@@ -5,6 +5,6 @@
 /.vscode
 
 # not sure if i should exclude migrations as i might delete several times over testing
-#/migrations
+/migrations
 
 app.db
