@@ -1,7 +1,7 @@
 from datetime import datetime
-from flask_wtf import Form, FlaskForm
+from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SelectMultipleField, DateTimeField, BooleanField
-from wtforms.validators import DataRequired, AnyOf, URL, InputRequired, Regexp
+from wtforms.validators import DataRequired, URL, InputRequired, Regexp
 
 # inheriting from flaskform to use validate_on_submit method
 class ShowForm(FlaskForm):

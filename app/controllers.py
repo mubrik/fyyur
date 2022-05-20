@@ -1,8 +1,9 @@
+'''
+  contains the route handlers for various endpoint
+'''
 from datetime import datetime
-from typing import List, Dict
-from sqlalchemy import select, join, func
-from sqlalchemy.orm import aliased
-from flask import Blueprint, render_template, request, flash, redirect, url_for
+from sqlalchemy import distinct, func
+from flask import render_template, request, flash, redirect, url_for
 from app import app, db
 from .forms import VenueForm, ShowForm, ArtistForm
 from .models import Artist, Venue, Show
@@ -25,22 +26,24 @@ def venues():
     .outerjoin(upcoming_show_tableqry, Venue.id == upcoming_show_tableqry.c.venue_id)\
     .group_by(Venue.state, Venue.id, Venue.name, upcoming_show_tableqry.c.num_upcoming_shows)
 
-  # table for state group
-  stmt_group_state = db.session.query(Venue.city, Venue.state).group_by(Venue.state, Venue.city)
+  # table for state grouping, distinct by state
+  stmt_group_state = db.session.query(Venue.city, Venue.state).distinct(Venue.state)
+  print(stmt_group_state)
   
   data = []
   for venue_city, venue_state in stmt_group_state:
-    # wonky list comprehension but i cant figure out the best query :(
     data.append({
       "city": venue_city,
       "state": venue_state,
+      # wonky list comprehension but i cant figure out the best query :( yet
       "venues": [
         {"id": id, "name": name, "state": state, "num_upcoming_shows": count if count is not None else 0} 
         for id, name, state, count in venue_showcount_join
         if state == venue_state
       ]
     })
-  print(data)
+  # print(data)
+
   if len(data) == 0:
     flash('No Venues, created yet')
 

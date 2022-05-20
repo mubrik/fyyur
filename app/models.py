@@ -3,7 +3,7 @@ from app import db
 
 class BaseModel(db.Model):
   '''
-    this is a base model class, includes fields all classes should have
+    this is a base model class/models, includes fields all classes should have
     id, created and modified
   '''
   __abstract__  = True
@@ -36,9 +36,9 @@ class Venue(BaseModel):
 
   def __init__(self, dict: Dict[str, Any], **kwargs):
     # https://docs.sqlalchemy.org/en/14/tutorial/metadata.html#other-mapped-class-details nice feature for a lazy person like me :)
-    # should bleach value of some keys
     super(Venue, self).__init__(**kwargs)
     for key, value in dict.items():
+      # should bleach value of some keys but not installed and not required in project?
       setattr(self, key, value)
 
   def __repr__(self):
