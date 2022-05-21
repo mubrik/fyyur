@@ -4,6 +4,7 @@ SQLAlchemy==1.4.36
 postgres==4.0
 psycopg2==2.9.3
 babel==2.9.0
+virtualenv==20.14.1
 # error: using format_datetime func, module 'collections' has no attribute 'Callable', https://docs.python.org/3/whatsnew/3.10.html#removed, updating to 2.8.2 from 2.6.0
 python-dateutil==2.8.2 
 #changing to 1.0.2 from 0.11.0 to fix moment import bug https://github.com/miguelgrinberg/flask-moment/blob/main/CHANGES.md

@@ -1,12 +1,12 @@
 from datetime import datetime
 from flask_wtf import FlaskForm
-from wtforms import StringField, SelectField, SelectMultipleField, DateTimeField, BooleanField
+from wtforms import StringField, SelectField, SelectMultipleField, DateTimeField, BooleanField, IntegerField
 from wtforms.validators import DataRequired, URL, InputRequired, Regexp
 
 # inheriting from flaskform to use validate_on_submit method
 class ShowForm(FlaskForm):
-  artist_id = StringField('artist_id')
-  venue_id = StringField('venue_id')
+  artist_id = IntegerField('artist_id')
+  venue_id = IntegerField('venue_id')
   start_time = DateTimeField('start_time', validators=[DataRequired()], default= datetime.today())
 
 class VenueForm(FlaskForm):
@@ -157,3 +157,13 @@ class ArtistForm(FlaskForm):
   website_link = StringField('website_link', validators=[URL()])
   seeking_venue = BooleanField( 'seeking_venue' )
   seeking_description = StringField('seeking_description')
+
+class SongForm(FlaskForm):
+  title = StringField('title', validators=[InputRequired()])
+  artist_id = IntegerField('artist_id', validators=[InputRequired()])
+  album_id = IntegerField('album_id', validators=[InputRequired()])
+  length = IntegerField('length')
+
+class AlbumForm(FlaskForm):
+  name = StringField('name', validators=[InputRequired()])
+  artist_id = IntegerField('artist_id', validators=[InputRequired()])

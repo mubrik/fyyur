@@ -1,0 +1,32 @@
+{% extends 'layouts/main.html' %}
+{% block title %}Fyyur | Tracks{% endblock %}
+{% block content %}
+<div class="row">
+  <h2 class="monospace"> Albums </h2>
+  {% if data.albums|length > 0 %}
+    {%for album in data.albums %}
+    <div class="col-sm-2">
+      <p> Name: {{ album.name }}</p>
+      <p> Artist: {{ album.artist.name }}</p>
+      <p> ID: {{ album.id }}</p>
+    </div>
+    {% endfor %}
+  {% else %}
+  <p> No albums Created </>
+  {% endif %}
+</div>
+<div class="row">
+  <h2 class="monospace">Songs</h2>
+  {% if data.songs|length > 0 %}
+    {%for song in data.songs %}
+    <div class="col-sm-2">
+      <p> Title: {{ song.title }}</p>
+      <p> Artist: {{ song.artist.name }}</p>
+      <p> ID: {{ song.id }}</p>
+    </div>
+    {% endfor %}
+  {% else %}
+  <p> No tracks Created </>
+  {% endif %}
+</div>
+{% endblock %}

@@ -61,6 +61,8 @@ class Artist(BaseModel):
   seeking_description = db.Column(db.String(500))
   genres = db.Column(db.PickleType, default=[], nullable=False)
   shows = db.relationship('Show', backref=db.backref('artist', lazy=True), lazy=True)
+  songs = db.relationship('Song', backref=db.backref('artist', lazy=True), lazy=True)
+  albums = db.relationship('Album', backref=db.backref('artist', lazy=True), lazy=True)
   # genres = db.relationship('Genre', backref=db.backref('artists', lazy=True), lazy='subquery')
 
   def __init__(self, dict: Dict[str, Any], **kwargs):
@@ -88,6 +90,44 @@ class Show(BaseModel):
 
   def __repr__(self):
     return f"Show(id={self.id!r} time={self.start_time})"
+
+class Song(BaseModel):
+  '''
+  Song model Class
+  '''
+  __tablename__ = 'song'
+
+  title = db.Column(db.String(120))
+  length = db.Column(db.Integer)
+  artist_id = db.Column(db.Integer, db.ForeignKey('artist.id'), nullable=False)
+  album_id = db.Column(db.Integer, db.ForeignKey('album.id'))
+
+  def __init__(self, dict: Dict[str, Any], **kwargs):
+    super(Song, self).__init__(**kwargs)
+    for key, value in dict.items():
+      setattr(self, key, value)
+
+  def __repr__(self):
+    return f"Song(id={self.id!r} title={self.title})"
+
+class Album(BaseModel):
+  '''
+  Album model Class
+  '''
+  __tablename__ = 'album'
+
+  name = db.Column(db.String(120))
+  songs = db.relationship('Song', backref=db.backref('album', lazy=True), lazy=True)
+  artist_id = db.Column(db.Integer, db.ForeignKey('artist.id'), nullable=False)
+
+  def __init__(self, dict: Dict[str, Any], **kwargs):
+    super(Album, self).__init__(**kwargs)
+    for key, value in dict.items():
+      setattr(self, key, value)
+
+  def __repr__(self):
+    return f"Album(id={self.id!r} title={self.name})"
+
 
 # no template to create, easier to make a pickled Object
 # class Genre(db.Model):

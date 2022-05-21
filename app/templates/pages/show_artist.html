@@ -44,6 +44,35 @@
 	</div>
 </div>
 <section>
+	<h2 class="monospace">Songs</h2>
+	{% if artist.songs|length > 0 %}
+	<div class="row">
+		{%for song in artist.songs %}
+			<div class="col-sm-2">
+				<h5>Title: {{ song.title }}</a></h5>
+				<h6>Duration: {{ song.length }} Minutes</h6>
+			</div>
+		{% endfor %}
+	</div>
+	{% else %}
+	<p> No songs created for this Artist </p>
+	{% endif %}
+</section>
+<section>
+	<h2 class="monospace">Albums</h2>
+	{% if artist.albums|length > 0 %}
+	<div class="row">
+		{%for album in artist.albums %}
+			<div class="col-sm-2">
+				<h5>Title: {{ album.name }}</a></h5>
+			</div>
+		{% endfor %}
+	</div>
+	{% else %}
+	<p> No albums created for this Artist </p>
+	{% endif %}
+</section>
+<section>
 	<h2 class="monospace">{{ artist.upcoming_shows_count }} Upcoming {% if artist.upcoming_shows_count == 1 %}Show{% else %}Shows{% endif %}</h2>
 	<div class="row">
 		{%for show in artist.upcoming_shows %}

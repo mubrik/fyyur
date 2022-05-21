@@ -5,14 +5,21 @@ from datetime import datetime
 from sqlalchemy import distinct, func
 from flask import render_template, request, flash, redirect, url_for
 from app import app, db
-from .forms import VenueForm, ShowForm, ArtistForm
-from .models import Artist, Venue, Show
+from .forms import VenueForm, ShowForm, ArtistForm, AlbumForm, SongForm
+from .models import Artist, Venue, Show, Album, Song
 from .forms import ArtistForm, VenueForm, ShowForm
 from .utils import display_form_error
 
+@app.route('/index')
 @app.route('/')
 def index():
-  return render_template('pages/home.html')
+  recent_venues = Venue.query.order_by(Venue.date_created).limit(10)
+  recent_artists = Artist.query.order_by(Artist.date_created).limit(10)
+  data = {
+    "artists": recent_artists,
+    "venues": recent_venues
+  }
+  return render_template('pages/home.html', data=data)
 
 @app.route('/venues')
 def venues():
@@ -388,6 +395,8 @@ def shows():
   all_shows = Show.query.limit(100).all()
   data = []
   for show in all_shows:
+    print(show.start_time)
+    print(type(show.start_time))
     data.append({
       "venue_id": show.venue_id,
       "venue_name": show.venue.name,
@@ -407,13 +416,27 @@ def create_shows():
   form = ShowForm(formdata=None)
   return render_template('forms/new_show.html', form=form)
 
-@app.route('/shows/create',  methods=['POST'])
+@app.route('/shows/create', methods=['POST'])
 def create_show_submission():
   # called to create new shows in the db, upon submitting new show listing form
   # TODO: insert form data as a new Show record in the db, instead
   # create form to validate
   show_form = ShowForm()
+  artist_id: int = show_form.data["artist_id"]
+  start_time: datetime = show_form.data["start_time"]
+  print(artist_id, start_time)
   if show_form.validate_on_submit():
+    # implement time availabilty, cant boo a show in same day already booked show
+     # get artist nd time
+    artist_id: int = show_form.data["artist_id"]
+    start_time: datetime = show_form.data["start_time"]
+    # get upcoming show with same date
+    upcoming_show = Show.query.filter(Show.artist_id == artist_id).filter(func.date(Show.start_time) == start_time.date()).first()
+    if upcoming_show is not None:
+      # that means show with date exist, return
+      flash('Error, Artist has a show scheduled for this date')
+      # render the previous form
+      return render_template('forms/new_show.html', form=ShowForm(formdata=None))
     # create Show
     show = Show(show_form.data)
     # add
@@ -433,6 +456,101 @@ def create_show_submission():
     # TODO: on unsuccessful db insert, flash an error instead.
     display_form_error(show_form.errors)
   return render_template('pages/home.html')
+
+@app.route('/songs/create')
+def create_song():
+  form = SongForm(formdata=None)
+  return render_template('forms/new_song.html', form=form)
+
+@app.route('/songs/create', methods=['POST'])
+def create_song_submission():
+  # form data
+  song_form = SongForm()
+  # logic
+  if song_form.validate_on_submit():
+    # verify artist and album
+    artist = Artist.query.get(song_form.data["artist_id"])
+    # this way, the album must be for the artist as well
+    album = Album.query.filter(Album.id == song_form.data["album_id"]).filter(Album.artist_id == song_form.data["artist_id"]).first()
+
+    if artist is None:
+      # error, return
+      flash('Error artist doesnt exist, Check artist ID')
+      return render_template('forms/new_song.html', form=SongForm(formdata=None))
+    if album is None:
+      # seperate if checks for better ux
+      flash('Error, Check Album ID. Artist has no album of that ID')
+      return render_template('forms/new_song.html', form=SongForm(formdata=None))
+    # artist and album fine
+    song = Song(song_form.data)
+    # add
+    db.session.add(song)
+    try:
+      # commit db session
+      db.session.commit()
+    except:
+      # if exception, wrong artist/venue id
+      flash('Error, check Artist/Album')
+      # render the previous form
+      return render_template('forms/new_song.html', form=SongForm(formdata=None))
+    else:
+      # on successful db insert, flash success
+      flash('Song successfully listed!')
+  else:
+    display_form_error(song_form.errors)
+    return render_template('forms/new_song.html', form=SongForm(formdata=None))
+  
+  return redirect(url_for('index'))
+
+@app.route('/albums/create')
+def create_album():
+  form = AlbumForm(formdata=None)
+  return render_template('forms/new_album.html', form=form)
+
+@app.route('/albums/create', methods=['POST'])
+def create_album_submission():
+  # form data
+  album_form = AlbumForm()
+  # logic
+  if album_form.validate_on_submit():
+    # verify artist
+    artist = Artist.query.get(album_form.data["artist_id"])
+    if artist is None:
+      # error, return
+      flash('Error, Check artistid')
+      return render_template('forms/new_album.html', form=AlbumForm(formdata=None))
+    # verify album name hasnt been created
+    created_album = Album.query.filter(Album.artist_id == album_form.data["artist_id"]).filter(Album.name == album_form.data["name"]).first()
+    if created_album is not None:
+      flash('Error, Album with that name exist for the artist')
+      return render_template('forms/new_album.html', form=AlbumForm(formdata=None))
+    # artist and album name fine
+    album = Album(album_form.data)
+    # add
+    db.session.add(album)
+    try:
+      # commit db session
+      db.session.commit()
+    except:
+      # if exception, wrong artist/venue id
+      flash('Error, check Artist')
+      # render the previous form
+      return render_template('forms/new_album.html', form=AlbumForm(formdata=None))
+    else:
+      # on successful db insert, flash success
+      flash('Album successfully listed!')
+  else:
+    display_form_error(album_form.errors)
+    return render_template('forms/new_album.html', form=AlbumForm(formdata=None))
+  
+  return redirect(url_for('index'))
+
+@app.route('/tracks')
+def tracks():
+  # get songs and albums
+  songs = Song.query.limit(100).all()
+  albums = Album.query.limit(100).all()
+  return render_template('pages/tracks.html', data={"songs": songs, "albums": albums})
 
 # error handlers
 @app.errorhandler(404)
