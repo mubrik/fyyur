@@ -3,7 +3,7 @@
 '''
 from datetime import datetime
 from sqlalchemy import distinct, func
-from flask import render_template, request, flash, redirect, url_for
+from flask import render_template, request, flash, redirect, url_for, jsonify
 from app import app, db
 from .forms import VenueForm, ShowForm, ArtistForm, AlbumForm, SongForm
 from .models import Artist, Venue, Show, Album, Song
@@ -156,15 +156,19 @@ def create_venue_submission():
     except:
       # if exception, wrong info form
       flash('Error, check Form')
+      # rollback
+      db.session.rollback()
       # render the previous form
       return render_template('forms/new_venue.html', form=VenueForm(formdata=None))
     else:
       # on successful db insert, flash success
       flash('Venue ' + venue_form.name.data + ' was successfully listed!')
+    finally:
+      db.session.close()
   else :
     # TODO: on unsuccessful db insert, flash an error instead.
     display_form_error(venue_form.errors)
-  return render_template('pages/home.html')
+  return redirect(url_for('index'))
 
 @app.route('/venues/<venue_id>/delete', methods=['GET'])
 def delete_venue(venue_id: int):
@@ -179,14 +183,24 @@ def delete_venue_submission(venue_id: int):
   # clicking that button delete it from the db then redirect the user to the homepage
   # get venue
   venue = Venue.query.get(venue_id)
+  isErrored = False
   if venue is not None:
     db.session.delete(venue)
-    res = db.session.commit()
-    flash('Venue Deleted')
-    return redirect(url_for('index'))
+    try:
+      db.session.commit()
+    except:
+      isErrored = True
+    finally:
+      db.session.close()
+      if isErrored:
+        flash('Error deleting item')
+        return jsonify({"status": "fail", "message": "Venue not found"});
+      else:
+        flash('Venue Deleted')
+        return jsonify({"status": "success", "message": "Completed"});
   else:
     flash('Error deleting item')
-  return None
+    return jsonify({"status": "fail", "message": "Venue not found"});
 
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id: int):
@@ -212,10 +226,16 @@ def edit_venue_submission(venue_id: int):
     print(venue)
     for key, val in venue_form.data.items():
       setattr(venue, key, val)
-    # commit db session
-    db.session.commit()
-    # on successful db insert, flash success
-    flash('Venue ' + venue_form.name.data + ' was successfully edited!')
+    try:
+      # commit db session
+      db.session.commit()
+      # on successful db insert, flash success
+      flash('Venue ' + venue_form.name.data + ' was successfully edited!')
+    except:
+      flash('Error editing venue')
+      db.session.rollback()
+    finally:
+      db.session.close()
   else:
     display_form_error(venue_form.errors)
   return redirect(url_for('show_venue', venue_id=venue_id))
@@ -347,10 +367,16 @@ def edit_artist_submission(artist_id):
     for key, val in artist_form.data.items():
       # should bleach some keys
       setattr(artist, key, val)
-    # commit db session
-    db.session.commit()
-    # on successful db insert, flash success
-    flash('Artist ' + artist_form.name.data + ' was successfully edited!')
+    try:
+      # commit db session
+      db.session.commit()
+      # on successful db insert, flash success
+      flash('Artist ' + artist_form.name.data + ' was successfully edited!')
+    except:
+      db.session.rollback()
+      flash('Error editing Artist')
+    finally:
+      db.session.close()
   else:
     display_form_error(artist_form.errors)
   return redirect(url_for('show_artist', artist_id=artist_id))
@@ -383,10 +409,12 @@ def create_artist_submission():
     else:
       # on successful db insert, flash success
       flash('Artist ' + artist_form.name.data + ' was successfully listed!')
+    finally:
+      db.session.close()
   else :
     # TODO: on unsuccessful db insert, flash an error instead.
     display_form_error(artist_form.errors)
-  return render_template('pages/home.html')
+  return redirect(url_for('index'))
 
 @app.route('/shows')
 def shows():
@@ -452,10 +480,12 @@ def create_show_submission():
     else:
       # on successful db insert, flash success
       flash('Show created successfully listed!')
+    finally:
+      db.session.close()
   else :
     # TODO: on unsuccessful db insert, flash an error instead.
     display_form_error(show_form.errors)
-  return render_template('pages/home.html')
+  return redirect(url_for('index'))
 
 @app.route('/songs/create')
 def create_song():
@@ -496,6 +526,8 @@ def create_song_submission():
     else:
       # on successful db insert, flash success
       flash('Song successfully listed!')
+    finally:
+      db.session.close()
   else:
     display_form_error(song_form.errors)
     return render_template('forms/new_song.html', form=SongForm(formdata=None))
@@ -534,11 +566,15 @@ def create_album_submission():
     except:
       # if exception, wrong artist/venue id
       flash('Error, check Artist')
+      # rollb
+      db.session.rollback()
       # render the previous form
       return render_template('forms/new_album.html', form=AlbumForm(formdata=None))
     else:
       # on successful db insert, flash success
       flash('Album successfully listed!')
+    finally:
+      db.session.close()
   else:
     display_form_error(album_form.errors)
     return render_template('forms/new_album.html', form=AlbumForm(formdata=None))

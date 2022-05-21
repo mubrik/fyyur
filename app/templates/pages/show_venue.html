@@ -76,7 +76,41 @@
 </section>
 
 <a href="/venues/{{ venue.id }}/edit"><button class="btn btn-primary btn-lg">Edit</button></a>
-<a href="/venues/{{ venue.id }}/delete"><button class="btn btn-danger btn-lg">Delete</button></a>
+<a href="/venues/{{ venue.id }}/delete"><button class="btn btn-danger btn-lg" id="deletebtn" data-id="{{venue.id}}" >Delete</button></a>
+
+<script>
+	// call back on click
+	const handleBtnSubmit = (event) => {
+		event.preventDefault();
+		// vars
+		const venueId = event.target.getAttribute("data-id");
+		const result = confirm("Confirm Delete");
+
+		if (result) {
+			// ajax
+			fetch(`/venues/${venueId}/delete`, {
+				method: "POST"
+			})
+			.then(result => {
+				result.json()
+				.then(res => {
+					const status = res["status"];
+					if (status === "success") {
+						// redirect user
+						window.location.replace("/venues");
+					} else {
+						alert("Error deleting item");
+					}
+				});
+			})
+			.catch(err => {
+				console.log(err);
+			});
+		}
+	};
+	// element to watch
+	const deletebtn = document.getElementById("deletebtn").addEventListener("click", handleBtnSubmit);
+</script>
 
 {% endblock %}
 
