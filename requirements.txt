@@ -1,5 +1,15 @@
+Flask==2.1.2
+FLask-Migrate==3.1.0
+SQLAlchemy==1.4.36
+postgres==4.0
+psycopg2==2.9.3
 babel==2.9.0
-python-dateutil==2.6.0
-flask-moment==0.11.0
-flask-wtf==0.14.3
-flask_sqlalchemy==2.4.4
+virtualenv==20.14.1
+# error: using format_datetime func, module 'collections' has no attribute 'Callable', https://docs.python.org/3/whatsnew/3.10.html#removed, updating to 2.8.2 from 2.6.0
+python-dateutil==2.8.2 
+#changing to 1.0.2 from 0.11.0 to fix moment import bug https://github.com/miguelgrinberg/flask-moment/blob/main/CHANGES.md
+flask-moment==1.0.2 
+# import bug from werzuk and collection, updating from 0.14.3 to 1.0.1 https://flask-wtf.readthedocs.io/en/1.0.x/changes/#version-0-14-3
+flask-wtf==1.0.1 
+#might as well use latest
+flask_sqlalchemy==2.5.1 

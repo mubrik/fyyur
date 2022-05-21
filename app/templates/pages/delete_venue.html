@@ -1,0 +1,12 @@
+{% extends 'layouts/main.html' %}
+{% block title %} Delete Venue {% endblock %}
+{% block content %}
+<div class="row">
+  <h3> Confirm Deletion</h3>
+  <form method="POST">
+    <input type="submit" value="Delete Venue" class="btn btn-danger btn-lg">
+    <input type="reset" value="Cancel" class="btn btn-primary btn-lg">
+  </form>
+</div>
+
+{% endblock %}

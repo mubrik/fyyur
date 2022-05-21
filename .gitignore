@@ -1,0 +1,12 @@
+/node_modules
+
+/__pycache__
+
+/.vscode
+
+# not sure if i should exclude migrations as i might delete several times over testing
+/migrations
+# bytecode, not necessary
+/__pycache__
+
+app.db
