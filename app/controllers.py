@@ -168,7 +168,7 @@ def create_venue_submission():
   else :
     # TODO: on unsuccessful db insert, flash an error instead.
     display_form_error(venue_form.errors)
-  return render_template('pages/home.html')
+  return redirect(url_for('index'))
 
 @app.route('/venues/<venue_id>/delete', methods=['GET'])
 def delete_venue(venue_id: int):
@@ -414,7 +414,7 @@ def create_artist_submission():
   else :
     # TODO: on unsuccessful db insert, flash an error instead.
     display_form_error(artist_form.errors)
-  return render_template('pages/home.html')
+  return redirect(url_for('index'))
 
 @app.route('/shows')
 def shows():
@@ -485,7 +485,7 @@ def create_show_submission():
   else :
     # TODO: on unsuccessful db insert, flash an error instead.
     display_form_error(show_form.errors)
-  return render_template('pages/home.html')
+  return redirect(url_for('index'))
 
 @app.route('/songs/create')
 def create_song():
