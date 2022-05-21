@@ -93,32 +93,34 @@ def show_venue(venue_id: int):
   upcoming_shows = []
   past_shows = []
   if venue is not None:
-    # curr date
-    current_date = datetime.now()
-    # compare dates
-    for show in venue.shows:
-      if show.start_time > current_date:
-        upcoming_shows.append({
-          "artist_id": show.artist_id,
-          "artist_name": show.artist.name,
-          "artist_image_link": show.artist.image_link,
-          "start_time": show.start_time.isoformat() # datatetime obj
-        })
-      else:
-        past_shows.append({
-          "artist_id": show.artist_id,
-          "artist_name": show.artist.name,
-          "artist_image_link": show.artist.image_link,
-          "start_time": show.start_time.isoformat() # datatetime obj
-        })
+    # get time
+    curr_time = datetime.now()
+    # query, filter by start date and artist id, join on artistid
+    upcoming_shows_query = db.session.query(Show.start_time, Artist.id, Artist.name, Artist.image_link)\
+      .filter(Show.venue_id == venue_id).filter(Show.start_time > datetime.now()).join(Artist, Show.artist_id == Artist.id)
+    past_shows_query = db.session.query(Show.start_time, Artist.id, Artist.name, Artist.image_link)\
+      .filter(Show.venue_id == venue_id).filter(Show.start_time < datetime.now()).join(Artist, Show.artist_id == Artist.id)
+    # counts
+    upcoming_shows_count = Show.query.filter(Show.venue_id == venue_id).filter(Show.start_time >  curr_time).count()
+    past_shows_count = Show.query.filter(Show.venue_id == venue_id).filter(Show.start_time <  curr_time).count()
+    
+    upcoming_shows = [
+      {"artist_id": id, "artist_name": name, "artist_image_link": link, "start_time": time} 
+      for time, id, name, link in upcoming_shows_query
+    ]
+
+    past_shows = [
+      {"artist_id": id, "artist_name": name, "artist_image_link": link, "start_time": time} 
+      for time, id, name, link in past_shows_query
+    ]
     data = venue
     setattr(data, "upcoming_shows", upcoming_shows)
-    setattr(data, "upcoming_shows_count", upcoming_shows.__len__())
+    setattr(data, "upcoming_shows_count", upcoming_shows_count)
     setattr(data, "past_shows", past_shows)
     setattr(data, "past_shows_count", past_shows.__len__())
   else:
     flash('Venue does not exist')
-    return render_template('pages/home.html')
+    return redirect(url_for('venues'))
   return render_template('pages/show_venue.html', venue=data)
 
 @app.route('/venues/create', methods=['GET'])
@@ -261,34 +263,56 @@ def show_artist(artist_id):
   # TODO: replace with real artist data from the artist table, using artist_id
   # get artist
   artist = Artist.query.get(artist_id)
-  upcoming_shows = []
-  past_shows = []
+  # upcoming_shows = []
+  # past_shows = []
   if artist is not None:
-    # curr date
-    current_date = datetime.now()
-    # compare dates
-    for show in artist.shows:
-      if show.start_time > current_date:
-        upcoming_shows.append({
-          "venue_id": show.venue_id,
-          "venue_name": show.venue.name,
-          "venue_image_link": show.venue.image_link,
-          "start_time": show.start_time.isoformat() # datatetime obj
-        })
-      else:
-        past_shows.append({
-          "venue_id": show.venue_id,
-          "venue_name": show.venue.name,
-          "venue_image_link": show.venue.image_link,
-          "start_time": show.start_time.isoformat() # datatetime obj
-        })
+    # # curr date
+    # current_date = datetime.now()
+    # # compare dates
+    # for show in artist.shows:
+    #   if show.start_time > current_date:
+    #     upcoming_shows.append({
+    #       "venue_id": show.venue_id,
+    #       "venue_name": show.venue.name,
+    #       "venue_image_link": show.venue.image_link,
+    #       "start_time": show.start_time.isoformat() # datatetime obj
+    #     })
+    #   else:
+    #     past_shows.append({
+    #       "venue_id": show.venue_id,
+    #       "venue_name": show.venue.name,
+    #       "venue_image_link": show.venue.image_link,
+    #       "start_time": show.start_time.isoformat() # datatetime obj
+    #     })
+    # get time
+    curr_time = datetime.now()
+    # query, filter by start date and artist id
+    upcoming_shows_query = db.session.query(Show.start_time, Venue.id, Venue.name, Venue.image_link)\
+      .filter(Show.artist_id == artist_id).filter(Show.start_time > datetime.now()).join(Venue, Show.venue_id == Venue.id)
+    past_shows_query = db.session.query(Show.start_time, Venue.id, Venue.name, Venue.image_link)\
+      .filter(Show.artist_id == artist_id).filter(Show.start_time < datetime.now()).join(Venue, Show.venue_id == Venue.id)
+    # counts
+    upcoming_shows_count = Show.query.filter(Show.artist_id == artist_id).filter(Show.start_time >  curr_time).count()
+    past_shows_count = Show.query.filter(Show.artist_id == artist_id).filter(Show.start_time <  curr_time).count()
+    
+    upcoming_shows = [
+      {"venue_id": id, "venue_name": name, "venue_image_link": link, "start_time": time} 
+      for time, id, name, link in upcoming_shows_query
+    ]
+
+    past_shows = [
+      {"venue_id": id, "venue_name": name, "venue_image_link": link, "start_time": time} 
+      for time, id, name, link in past_shows_query
+    ]
+
     data = artist
     setattr(data, "upcoming_shows", upcoming_shows)
-    setattr(data, "upcoming_shows_count", upcoming_shows.__len__())
+    setattr(data, "upcoming_shows_count", upcoming_shows_count)
     setattr(data, "past_shows", past_shows)
-    setattr(data, "past_shows_count", past_shows.__len__())
+    setattr(data, "past_shows_count", past_shows_count)
   else:
     flash('Artist does not exist')
+    return redirect(url_for("artists"))
   return render_template('pages/show_artist.html', artist=data)
 
 @app.route('/artists/<int:artist_id>/edit', methods=['GET'])
@@ -313,8 +337,8 @@ def edit_artist_submission(artist_id):
   # validate
   if artist_form.validate_on_submit():
     # loop form data
-    print(artist)
     for key, val in artist_form.data.items():
+      # should bleach some keys
       setattr(artist, key, val)
     # commit db session
     db.session.commit()

@@ -1,5 +1,6 @@
 import os
 from app import app
+from datetime import datetime
 import dateutil.parser
 import babel
 import logging
@@ -9,7 +10,9 @@ def format_datetime(value, format='medium'):
   '''
     Filter datetime callback function
   '''
-  print(value)
+  # change format if instance of datetime
+  if isinstance(value, datetime):
+    value = value.isoformat()
   date = dateutil.parser.parse(value)
   if format == 'full':
       format="EEEE MMMM, d, y 'at' h:mma"
