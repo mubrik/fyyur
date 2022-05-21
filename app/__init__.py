@@ -20,4 +20,4 @@ migrate = Migrate(app, db)
 from . import controllers
 
 # create DB
-db.create_all()
+# db.create_all()
