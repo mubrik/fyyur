@@ -2,59 +2,83 @@
   contains the route handlers for various endpoint
 '''
 from datetime import datetime
-from sqlalchemy import distinct, func
-from flask import render_template, request, flash, redirect, url_for, jsonify
+from typing import List
+from sqlalchemy import func
+from flask import (
+  render_template, request, flash,
+  redirect, url_for, jsonify
+)
 from app import app, db
 from .forms import VenueForm, ShowForm, ArtistForm, AlbumForm, SongForm
 from .models import Artist, Venue, Show, Album, Song
-from .forms import ArtistForm, VenueForm, ShowForm
 from .utils import display_form_error
+
 
 @app.route('/index')
 @app.route('/')
 def index():
-  recent_venues = Venue.query.order_by(Venue.date_created).limit(10)
-  recent_artists = Artist.query.order_by(Artist.date_created).limit(10)
+  recent_venues = Venue.query.order_by(Venue.date_created).all()
+  recent_artists = Artist.query.order_by(Artist.date_created).all()
   data = {
     "artists": recent_artists,
     "venues": recent_venues
   }
   return render_template('pages/home.html', data=data)
 
+
 @app.route('/venues')
 def venues():
   # TODO: replace with real venues data.
-  curr_datetime = datetime.now()
-  # filter shows table for upcoming shows compare with curr time, group by venue and count each group
-  upcoming_show_tableqry = db.session.query(Show.venue_id, func.count(Show.venue_id)\
-    .label('num_upcoming_shows')).filter(Show.start_time > curr_datetime).group_by(Show.venue_id).subquery()
-  # table for id name state and count upcoming shows
-  venue_showcount_join = db.session.query(Venue.id, Venue.name, Venue.state, upcoming_show_tableqry.c.num_upcoming_shows)\
-    .outerjoin(upcoming_show_tableqry, Venue.id == upcoming_show_tableqry.c.venue_id)\
-    .group_by(Venue.state, Venue.id, Venue.name, upcoming_show_tableqry.c.num_upcoming_shows)
+  # curr_datetime = datetime.now()
+  # # filter shows table for upcoming shows compare with curr time, group by venue and count each group
+  # upcoming_show_tableqry = db.session.query(Show.venue_id, func.count(Show.venue_id)\
+  #   .label('num_upcoming_shows')).filter(Show.start_time > curr_datetime).group_by(Show.venue_id).subquery()
+  # # table for id name state and count upcoming shows
+  # venue_showcount_join = db.session.query(Venue.id, Venue.name, Venue.state, upcoming_show_tableqry.c.num_upcoming_shows)\
+  #   .outerjoin(upcoming_show_tableqry, Venue.id == upcoming_show_tableqry.c.venue_id)\
+  #   .group_by(Venue.state, Venue.id, Venue.name, upcoming_show_tableqry.c.num_upcoming_shows)
 
-  # table for state grouping, distinct by state
-  stmt_group_state = db.session.query(Venue.city, Venue.state).distinct(Venue.state)
-  print(stmt_group_state)
+  # # table for state grouping, distinct by state
+  # stmt_group_state = db.session.query(Venue.city, Venue.state).distinct(Venue.state)
+  # print(stmt_group_state)
   
-  data = []
-  for venue_city, venue_state in stmt_group_state:
-    data.append({
-      "city": venue_city,
-      "state": venue_state,
-      # wonky list comprehension but i cant figure out the best query :( yet
+  # data = []
+  # for venue_city, venue_state in stmt_group_state:
+  #   data.append({
+  #     "city": venue_city,
+  #     "state": venue_state,
+  #     # wonky list comprehension but i cant figure out the best query :( yet
+  #     "venues": [
+  #       {"id": id, "name": name, "state": state, "num_upcoming_shows": count if count is not None else 0} 
+  #       for id, name, state, count in venue_showcount_join
+  #       if state == venue_state
+  #     ]
+  #   })
+  # print(data)
+  
+  distinct_venues: List[Venue] = Venue.query.distinct(Venue.state, Venue.city).all()
+  all_venues: List[Venue] = Venue.query.all()
+  returned_data = []
+  curr_datetime = datetime.now()
+  
+  for venue in distinct_venues:
+    returned_data.append({
+      "city": venue.city,
+      "state": venue.state,
       "venues": [
-        {"id": id, "name": name, "state": state, "num_upcoming_shows": count if count is not None else 0} 
-        for id, name, state, count in venue_showcount_join
-        if state == venue_state
+        {"id": sub_venue.id, "name": sub_venue.name, 
+         "state": sub_venue.state, 
+         "num_upcoming_shows": len([show for show in sub_venue.shows if show.start_time > curr_datetime])
+        }
+        for sub_venue in all_venues
+        if sub_venue.city == venue.city and sub_venue.state == venue.state
       ]
     })
-  # print(data)
 
-  if len(data) == 0:
+  if len(returned_data) == 0:
     flash('No Venues, created yet')
 
-  return render_template('pages/venues.html', areas=data);
+  return render_template('pages/venues.html', areas=returned_data);
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
@@ -62,30 +86,45 @@ def search_venues():
   # variables
   query = request.form.get('search_term', '')
   # should bleach query?
-  count = Venue.query.filter(Venue.name.ilike(f'%{query}%')).count()
+  venues_query: List[Venue] = Venue.query.filter(Venue.name.ilike(f'%{query}%')).all()
   data_array = []
-  # if search finds something
-  if count != 0 :
-    # get current date
-    curr_datetime = datetime.now()
-    # filter shows table for upcoming shows, group by artist and count each group
-    stmt = db.session.query(Show.id, Show.venue_id, func.count('*')\
-      .label('upcoming_count')).filter(Show.start_time > curr_datetime).group_by(Show.venue_id, Show.id).subquery()
-    # join filtered venue table with filtered shows table
-    stmt_result = db.session.query(Venue, stmt.c.upcoming_count).outerjoin(stmt, Venue.id == stmt.c.venue_id).filter(Venue.name.ilike(f'%{query}%'))
-    print(stmt_result)
-    for venue, show_c in stmt_result:
+  # time
+  curr_datetime = datetime.now()
+  if len(venues_query) > 0:
+    # shows is joined iin relationship
+    for venue in venues_query:
       data_array.append({
         "id": venue.id,
         "name": venue.name,
-        "num_upcoming_shows": show_c if show_c is not None else 0
+        "num_upcoming_shows": len([
+          show for show in venue.shows
+          if show.start_time >= curr_datetime
+        ])
       })
+  # data_array = []
+  # # if search finds something
+  # if count != 0 :
+  #   # get current date
+  #   curr_datetime = datetime.now()
+  #   # 
+  #   # filter shows table for upcoming shows, group by artist and count each group
+  #   stmt = db.session.query(Show.id, Show.venue_id, func.count('*')\
+  #     .label('upcoming_count')).filter(Show.start_time > curr_datetime).group_by(Show.venue_id, Show.id).subquery()
+  #   # join filtered venue table with filtered shows table
+  #   stmt_result = db.session.query(Venue, stmt.c.upcoming_count).outerjoin(stmt, Venue.id == stmt.c.venue_id).filter(Venue.name.ilike(f'%{query}%'))
+  #   print(stmt_result)
+  #   for venue, show_c in stmt_result:
+  #     data_array.append({
+  #       "id": venue.id,
+  #       "name": venue.name,
+  #       "num_upcoming_shows": show_c if show_c is not None else 0
+  #     })
   else:
     # count is 0, found nothing
     flash('No venues found', 'info')
 
   response = {
-    "count": count,
+    "count": len(venues_query),
     "data": data_array
   }
   print(response)
@@ -95,36 +134,55 @@ def search_venues():
 def show_venue(venue_id: int):
   # shows the venue page with the given venue_id
   # TODO: replace with real venue data from the venues table, using venue_id
-  # get artist
-  venue = Venue.query.get(venue_id)
+  # get venue
+  venue: Venue = Venue.query.get(venue_id)
   upcoming_shows = []
   past_shows = []
   if venue is not None:
     # get time
     curr_time = datetime.now()
+    # show is a joined query iterate
+    for show in venue.shows:
+      show_obj = {
+        "artist_id": show.artist_id, 
+        "artist_name": show.artist.name, 
+        "artist_image_link": show.artist.website_link, 
+        "start_time": show.start_time
+      }
+      
+      if (show.start_time >= curr_time):
+        upcoming_shows.append(show_obj)
+      else:
+        past_shows.append(show_obj)
+  
+    data = vars(venue)
+    data['upcoming_shows'] = upcoming_shows
+    data['upcoming_shows_count'] = len(upcoming_shows)
+    data['past_shows'] = past_shows
+    data['past_shows_count'] = len(past_shows)
     # query, filter by start date and artist id, join on artistid
-    upcoming_shows_query = db.session.query(Show.start_time, Artist.id, Artist.name, Artist.image_link)\
-      .filter(Show.venue_id == venue_id).filter(Show.start_time > datetime.now()).join(Artist, Show.artist_id == Artist.id)
-    past_shows_query = db.session.query(Show.start_time, Artist.id, Artist.name, Artist.image_link)\
-      .filter(Show.venue_id == venue_id).filter(Show.start_time < datetime.now()).join(Artist, Show.artist_id == Artist.id)
-    # counts
-    upcoming_shows_count = Show.query.filter(Show.venue_id == venue_id).filter(Show.start_time >  curr_time).count()
-    past_shows_count = Show.query.filter(Show.venue_id == venue_id).filter(Show.start_time <  curr_time).count()
-    
-    upcoming_shows = [
-      {"artist_id": id, "artist_name": name, "artist_image_link": link, "start_time": time} 
-      for time, id, name, link in upcoming_shows_query
-    ]
+    # upcoming_shows_query = db.session.query(Show.start_time, Artist.id, Artist.name, Artist.image_link)\
+    #   .filter(Show.venue_id == venue_id).filter(Show.start_time > datetime.now()).join(Artist, Show.artist_id == Artist.id)
+    # past_shows_query = db.session.query(Show.start_time, Artist.id, Artist.name, Artist.image_link)\
+    #   .filter(Show.venue_id == venue_id).filter(Show.start_time < datetime.now()).join(Artist, Show.artist_id == Artist.id)
+    # # counts
+    # upcoming_shows_count = Show.query.filter(Show.venue_id == venue_id).filter(Show.start_time >  curr_time).count()
+    # past_shows_count = Show.query.filter(Show.venue_id == venue_id).filter(Show.start_time <  curr_time).count()
+    # upcoming_shows = [
+    #   {"artist_id": id, "artist_name": name, "artist_image_link": link, "start_time": time} 
+    #   for time, id, name, link in upcoming_shows_query
+    # ]
 
-    past_shows = [
-      {"artist_id": id, "artist_name": name, "artist_image_link": link, "start_time": time} 
-      for time, id, name, link in past_shows_query
-    ]
-    data = venue
-    setattr(data, "upcoming_shows", upcoming_shows)
-    setattr(data, "upcoming_shows_count", upcoming_shows_count)
-    setattr(data, "past_shows", past_shows)
-    setattr(data, "past_shows_count", past_shows.__len__())
+    # past_shows = [
+    #   {"artist_id": id, "artist_name": name, "artist_image_link": link, "start_time": time} 
+    #   for time, id, name, link in past_shows_query
+    # ]
+    # data = venue
+    # print(data.website_link)
+    # setattr(data, "upcoming_shows", upcoming_shows)
+    # setattr(data, "upcoming_shows_count", upcoming_shows_count)
+    # setattr(data, "past_shows", past_shows)
+    # setattr(data, "past_shows_count", past_shows.__len__())
   else:
     flash('Venue does not exist')
     return redirect(url_for('venues'))
@@ -170,9 +228,9 @@ def create_venue_submission():
     display_form_error(venue_form.errors)
   return redirect(url_for('index'))
 
-@app.route('/venues/<venue_id>/delete', methods=['GET'])
-def delete_venue(venue_id: int):
-  return render_template('pages/delete_venue.html')
+# @app.route('/venues/<venue_id>/delete', methods=['GET'])
+# def delete_venue(venue_id: int):
+#   return render_template('pages/delete_venue.html')
 
 @app.route('/venues/<venue_id>/delete', methods=['POST'])
 def delete_venue_submission(venue_id: int):
@@ -244,10 +302,21 @@ def edit_venue_submission(venue_id: int):
 def artists():
   # TODO: replace with real data returned from querying the database
   # get artists
-  data = Artist.query.limit(100).all()
-
-  if len(data) == 0:
+  artists_query: List[Artist] = Artist.query.limit(100).all()
+  data = []
+  # time
+  curr_datetime = datetime.now()
+  if len(artists_query) == 0:
     flash('No Artists have been created', 'error')
+  else:
+    for artist in artists_query:
+      temp_artist = vars(artist)
+      temp_artist["num_upcoming_shows"] = len([
+        show for show in artist.shows
+        if show.start_time > curr_datetime
+      ])
+      data.append(temp_artist)
+
   return render_template('pages/artists.html', artists=data)
 
 @app.route('/artists/search', methods=['POST'])
@@ -256,30 +325,26 @@ def search_artists():
   # variables
   query = request.form.get('search_term', '')
   # should bleach query?
-  count = Artist.query.filter(Artist.name.ilike(f'%{query}%')).count()
+  artists_query = Artist.query.filter(Artist.name.ilike(f'%{query}%')).all()
   data_array = []
-  # if search finds something
-  if count != 0 :
-    # get current date
-    curr_datetime = datetime.now()
-    # filter shows table for upcoming shows, group by artist and count each group
-    stmt = db.session.query(Show.artist_id, func.count('*')\
-      .label('upcoming_count')).filter(Show.start_time > curr_datetime).group_by(Show.artist_id).subquery()
-    # join filtered artist table with filtered shows table
-    stmt_result = db.session.query(Artist, stmt.c.upcoming_count).outerjoin(stmt, Artist.id == stmt.c.artist_id).filter(Artist.name.ilike(f'%{query}%'))
-    print(stmt_result)
-    for artist, show_c in stmt_result:
+  curr_datetime = datetime.now()
+  if len(artists_query) > 0:
+    # shows is joined iin relationship
+    for artist in artists_query:
       data_array.append({
         "id": artist.id,
         "name": artist.name,
-        "num_upcoming_shows": show_c if show_c is not None else 0
+        "num_upcoming_shows": len([
+          show for show in artist.shows
+          if show.start_time >= curr_datetime
+        ])
       })
   else:
     # count is 0, found nothing
     flash('No artists found', 'info')
 
   response = {
-    "count": count,
+    "count": len(artists_query),
     "data": data_array
   }
   return render_template('pages/search_artists.html', results=response, search_term=query)
@@ -289,54 +354,56 @@ def show_artist(artist_id):
   # shows the artist page with the given artist_id
   # TODO: replace with real artist data from the artist table, using artist_id
   # get artist
-  artist = Artist.query.get(artist_id)
-  # upcoming_shows = []
-  # past_shows = []
+  artist: Artist = Artist.query.get(artist_id)
+  upcoming_shows = []
+  past_shows = []
   if artist is not None:
-    # # curr date
-    # current_date = datetime.now()
-    # # compare dates
-    # for show in artist.shows:
-    #   if show.start_time > current_date:
-    #     upcoming_shows.append({
-    #       "venue_id": show.venue_id,
-    #       "venue_name": show.venue.name,
-    #       "venue_image_link": show.venue.image_link,
-    #       "start_time": show.start_time.isoformat() # datatetime obj
-    #     })
-    #   else:
-    #     past_shows.append({
-    #       "venue_id": show.venue_id,
-    #       "venue_name": show.venue.name,
-    #       "venue_image_link": show.venue.image_link,
-    #       "start_time": show.start_time.isoformat() # datatetime obj
-    #     })
-    # get time
+    # curr date
     curr_time = datetime.now()
+    # iterate outer joined shows
+    for show in artist.shows:
+      artist_obj = {
+        "venue_id": show.venue_id, 
+        "venue_name": show.venue.name, 
+        "venue_image_link": show.venue.website_link, 
+        "start_time": show.start_time
+      }
+      
+      if (show.start_time >= curr_time):
+        upcoming_shows.append(artist_obj)
+      else:
+        past_shows.append(artist_obj)
+  
+    data = vars(artist)
+    data['upcoming_shows'] = upcoming_shows
+    data['upcoming_shows_count'] = len(upcoming_shows)
+    data['past_shows'] = past_shows
+    data['past_shows_count'] = len(past_shows)
+
     # query, filter by start date and artist id
-    upcoming_shows_query = db.session.query(Show.start_time, Venue.id, Venue.name, Venue.image_link)\
-      .filter(Show.artist_id == artist_id).filter(Show.start_time > datetime.now()).join(Venue, Show.venue_id == Venue.id)
-    past_shows_query = db.session.query(Show.start_time, Venue.id, Venue.name, Venue.image_link)\
-      .filter(Show.artist_id == artist_id).filter(Show.start_time < datetime.now()).join(Venue, Show.venue_id == Venue.id)
-    # counts
-    upcoming_shows_count = Show.query.filter(Show.artist_id == artist_id).filter(Show.start_time >  curr_time).count()
-    past_shows_count = Show.query.filter(Show.artist_id == artist_id).filter(Show.start_time <  curr_time).count()
+    # upcoming_shows_query = db.session.query(Show.start_time, Venue.id, Venue.name, Venue.image_link)\
+    #   .filter(Show.artist_id == artist_id).filter(Show.start_time > datetime.now()).join(Venue, Show.venue_id == Venue.id)
+    # past_shows_query = db.session.query(Show.start_time, Venue.id, Venue.name, Venue.image_link)\
+    #   .filter(Show.artist_id == artist_id).filter(Show.start_time < datetime.now()).join(Venue, Show.venue_id == Venue.id)
+    # # counts
+    # upcoming_shows_count = Show.query.filter(Show.artist_id == artist_id).filter(Show.start_time >  curr_time).count()
+    # past_shows_count = Show.query.filter(Show.artist_id == artist_id).filter(Show.start_time <  curr_time).count()
     
-    upcoming_shows = [
-      {"venue_id": id, "venue_name": name, "venue_image_link": link, "start_time": time} 
-      for time, id, name, link in upcoming_shows_query
-    ]
+    # upcoming_shows = [
+    #   {"venue_id": id, "venue_name": name, "venue_image_link": link, "start_time": time} 
+    #   for time, id, name, link in upcoming_shows_query
+    # ]
 
-    past_shows = [
-      {"venue_id": id, "venue_name": name, "venue_image_link": link, "start_time": time} 
-      for time, id, name, link in past_shows_query
-    ]
+    # past_shows = [
+    #   {"venue_id": id, "venue_name": name, "venue_image_link": link, "start_time": time} 
+    #   for time, id, name, link in past_shows_query
+    # ]
 
-    data = artist
-    setattr(data, "upcoming_shows", upcoming_shows)
-    setattr(data, "upcoming_shows_count", upcoming_shows_count)
-    setattr(data, "past_shows", past_shows)
-    setattr(data, "past_shows_count", past_shows_count)
+    # data = artist
+    # setattr(data, "upcoming_shows", upcoming_shows)
+    # setattr(data, "upcoming_shows_count", upcoming_shows_count)
+    # setattr(data, "past_shows", past_shows)
+    # setattr(data, "past_shows_count", past_shows_count)
   else:
     flash('Artist does not exist')
     return redirect(url_for("artists"))
@@ -405,7 +472,7 @@ def create_artist_submission():
       # if exception, wrong artist/venue id
       flash('Error, check Form')
       # render the previous form
-      return render_template('forms/new_artist.html', form=ArtistForm(formdata=None))
+      return render_template('forms/new_artist.html', form=ArtistForm(data=artist_form.data))
     else:
       # on successful db insert, flash success
       flash('Artist ' + artist_form.name.data + ' was successfully listed!')
@@ -414,6 +481,7 @@ def create_artist_submission():
   else :
     # TODO: on unsuccessful db insert, flash an error instead.
     display_form_error(artist_form.errors)
+    return render_template('forms/new_artist.html', form=ArtistForm(data=artist_form.data))
   return redirect(url_for('index'))
 
 @app.route('/shows')
@@ -423,8 +491,6 @@ def shows():
   all_shows = Show.query.limit(100).all()
   data = []
   for show in all_shows:
-    print(show.start_time)
-    print(type(show.start_time))
     data.append({
       "venue_id": show.venue_id,
       "venue_name": show.venue.name,
@@ -450,21 +516,18 @@ def create_show_submission():
   # TODO: insert form data as a new Show record in the db, instead
   # create form to validate
   show_form = ShowForm()
-  artist_id: int = show_form.data["artist_id"]
-  start_time: datetime = show_form.data["start_time"]
-  print(artist_id, start_time)
   if show_form.validate_on_submit():
     # implement time availabilty, cant boo a show in same day already booked show
      # get artist nd time
-    artist_id: int = show_form.data["artist_id"]
-    start_time: datetime = show_form.data["start_time"]
+    artist_id: int = show_form.artist_id.data
+    start_time: datetime = show_form.start_time.data
     # get upcoming show with same date
     upcoming_show = Show.query.filter(Show.artist_id == artist_id).filter(func.date(Show.start_time) == start_time.date()).first()
     if upcoming_show is not None:
       # that means show with date exist, return
       flash('Error, Artist has a show scheduled for this date')
       # render the previous form
-      return render_template('forms/new_show.html', form=ShowForm(formdata=None))
+      return render_template('forms/new_show.html', form=ShowForm(data=show_form.data))
     # create Show
     show = Show(show_form.data)
     # add
@@ -476,7 +539,7 @@ def create_show_submission():
       # if exception, wrong artist/venue id
       flash('Error, check Artist/Venue')
       # render the previous form
-      return render_template('forms/new_show.html', form=ShowForm(formdata=None))
+      return render_template('forms/new_show.html', form=ShowForm(data=show_form.data))
     else:
       # on successful db insert, flash success
       flash('Show created successfully listed!')
@@ -499,18 +562,18 @@ def create_song_submission():
   # logic
   if song_form.validate_on_submit():
     # verify artist and album
-    artist = Artist.query.get(song_form.data["artist_id"])
+    artist = Artist.query.get(song_form.artist_id.data)
     # this way, the album must be for the artist as well
-    album = Album.query.filter(Album.id == song_form.data["album_id"]).filter(Album.artist_id == song_form.data["artist_id"]).first()
+    album = Album.query.filter(Album.id == song_form.album_id.data).filter(Album.artist_id == song_form.artist_id.data).first()
 
     if artist is None:
       # error, return
       flash('Error artist doesnt exist, Check artist ID')
-      return render_template('forms/new_song.html', form=SongForm(formdata=None))
+      return render_template('forms/new_song.html', form=SongForm(data=song_form.data))
     if album is None:
       # seperate if checks for better ux
       flash('Error, Check Album ID. Artist has no album of that ID')
-      return render_template('forms/new_song.html', form=SongForm(formdata=None))
+      return render_template('forms/new_song.html', form=SongForm(data=song_form.data))
     # artist and album fine
     song = Song(song_form.data)
     # add
@@ -522,7 +585,7 @@ def create_song_submission():
       # if exception, wrong artist/venue id
       flash('Error, check Artist/Album')
       # render the previous form
-      return render_template('forms/new_song.html', form=SongForm(formdata=None))
+      return render_template('forms/new_song.html', form=SongForm(data=song_form.data))
     else:
       # on successful db insert, flash success
       flash('Song successfully listed!')
@@ -530,7 +593,7 @@ def create_song_submission():
       db.session.close()
   else:
     display_form_error(song_form.errors)
-    return render_template('forms/new_song.html', form=SongForm(formdata=None))
+    return render_template('forms/new_song.html', form=SongForm(data=song_form.data))
   
   return redirect(url_for('index'))
 
@@ -546,16 +609,16 @@ def create_album_submission():
   # logic
   if album_form.validate_on_submit():
     # verify artist
-    artist = Artist.query.get(album_form.data["artist_id"])
+    artist = Artist.query.get(album_form.artist_id.data)
     if artist is None:
       # error, return
       flash('Error, Check artistid')
-      return render_template('forms/new_album.html', form=AlbumForm(formdata=None))
+      return render_template('forms/new_album.html', form=AlbumForm(data=album_form.data))
     # verify album name hasnt been created
-    created_album = Album.query.filter(Album.artist_id == album_form.data["artist_id"]).filter(Album.name == album_form.data["name"]).first()
+    created_album = Album.query.filter(Album.artist_id == album_form.artist_id.data).filter(Album.name == album_form.data).first()
     if created_album is not None:
       flash('Error, Album with that name exist for the artist')
-      return render_template('forms/new_album.html', form=AlbumForm(formdata=None))
+      return render_template('forms/new_album.html', form=AlbumForm(data=album_form.data))
     # artist and album name fine
     album = Album(album_form.data)
     # add
@@ -569,7 +632,7 @@ def create_album_submission():
       # rollb
       db.session.rollback()
       # render the previous form
-      return render_template('forms/new_album.html', form=AlbumForm(formdata=None))
+      return render_template('forms/new_album.html', form=AlbumForm(data=album_form.data))
     else:
       # on successful db insert, flash success
       flash('Album successfully listed!')
@@ -577,15 +640,15 @@ def create_album_submission():
       db.session.close()
   else:
     display_form_error(album_form.errors)
-    return render_template('forms/new_album.html', form=AlbumForm(formdata=None))
+    return render_template('forms/new_album.html', form=AlbumForm(data=album_form.data))
   
   return redirect(url_for('index'))
 
 @app.route('/tracks')
 def tracks():
   # get songs and albums
-  songs = Song.query.limit(100).all()
-  albums = Album.query.limit(100).all()
+  songs = Song.query.all()
+  albums = Album.query.all()
   return render_template('pages/tracks.html', data={"songs": songs, "albums": albums})
 
 # error handlers

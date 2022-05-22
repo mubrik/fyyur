@@ -1,3 +1,6 @@
+'''
+ holds models for all tables
+'''
 from typing import Dict, Any
 from app import db
 
@@ -31,13 +34,13 @@ class Venue(BaseModel):
   seeking_talent = db.Column(db.Boolean, default=False, nullable=False)
   seeking_description = db.Column(db.String(500))
   genres = db.Column(db.PickleType, default=[], nullable=False)
-  shows = db.relationship('Show', backref=db.backref('venue', lazy=True), lazy=True)
+  shows = db.relationship('Show', backref=db.backref('venue', lazy='joined'), lazy='joined')
   # genres = db.relationship('Genre', backref=db.backref('venues', lazy=True), lazy='subquery')
 
-  def __init__(self, dict: Dict[str, Any], **kwargs):
+  def __init__(self, obj: Dict[str, Any], **kwargs):
     # https://docs.sqlalchemy.org/en/14/tutorial/metadata.html#other-mapped-class-details nice feature for a lazy person like me :)
     super(Venue, self).__init__(**kwargs)
-    for key, value in dict.items():
+    for key, value in obj.items():
       # should bleach value of some keys but not installed and not required in project?
       setattr(self, key, value)
 
@@ -60,14 +63,14 @@ class Artist(BaseModel):
   seeking_venue = db.Column(db.Boolean, default=False, nullable=False)
   seeking_description = db.Column(db.String(500))
   genres = db.Column(db.PickleType, default=[], nullable=False)
-  shows = db.relationship('Show', backref=db.backref('artist', lazy=True), lazy=True)
+  shows = db.relationship('Show', backref=db.backref('artist', lazy='joined'), lazy='joined')
   songs = db.relationship('Song', backref=db.backref('artist', lazy=True), lazy=True)
   albums = db.relationship('Album', backref=db.backref('artist', lazy=True), lazy=True)
   # genres = db.relationship('Genre', backref=db.backref('artists', lazy=True), lazy='subquery')
 
-  def __init__(self, dict: Dict[str, Any], **kwargs):
+  def __init__(self, obj: Dict[str, Any], **kwargs):
     super(Artist, self).__init__(**kwargs)
-    for key, value in dict.items():
+    for key, value in obj.items():
       setattr(self, key, value)
 
   def __repr__(self):
@@ -83,9 +86,9 @@ class Show(BaseModel):
   artist_id = db.Column(db.Integer, db.ForeignKey('artist.id'), nullable=False)
   venue_id = db.Column(db.Integer, db.ForeignKey('venue.id'), nullable=False)
 
-  def __init__(self, dict: Dict[str, Any], **kwargs):
+  def __init__(self, obj: Dict[str, Any], **kwargs):
     super(Show, self).__init__(**kwargs)
-    for key, value in dict.items():
+    for key, value in obj.items():
       setattr(self, key, value)
 
   def __repr__(self):
@@ -102,9 +105,9 @@ class Song(BaseModel):
   artist_id = db.Column(db.Integer, db.ForeignKey('artist.id'), nullable=False)
   album_id = db.Column(db.Integer, db.ForeignKey('album.id'))
 
-  def __init__(self, dict: Dict[str, Any], **kwargs):
+  def __init__(self, obj: Dict[str, Any], **kwargs):
     super(Song, self).__init__(**kwargs)
-    for key, value in dict.items():
+    for key, value in obj.items():
       setattr(self, key, value)
 
   def __repr__(self):
@@ -120,30 +123,11 @@ class Album(BaseModel):
   songs = db.relationship('Song', backref=db.backref('album', lazy=True), lazy=True)
   artist_id = db.Column(db.Integer, db.ForeignKey('artist.id'), nullable=False)
 
-  def __init__(self, dict: Dict[str, Any], **kwargs):
+  def __init__(self, obj: Dict[str, Any], **kwargs):
     super(Album, self).__init__(**kwargs)
-    for key, value in dict.items():
+    for key, value in obj.items():
       setattr(self, key, value)
 
   def __repr__(self):
     return f"Album(id={self.id!r} title={self.name})"
 
-
-# no template to create, easier to make a pickled Object
-# class Genre(db.Model):
-#   '''
-#   Genre model Class
-#   '''
-#   __tablename__ = 'genre'
-
-#   id = db.Column(db.Integer, primary_key=True)
-#   name = db.Column(db.String(80))
-
-# '''
-#   genre, n to many table
-# '''
-# genres = db.Table('genres',
-#   db.Column('genre_id', db.Integer, db.ForeignKey('genre.id'), primary_key=True),
-#   db.Column('artist_id', db.Integer, db.ForeignKey('artist.id'), primary_key=True),
-#   db.Column('venue_id', db.Integer, db.ForeignKey('venue.id'), primary_key=True)
-# )
